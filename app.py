@@ -174,14 +174,11 @@ def escaneo_directo_publicaciones(desglose):
                     resuelve_texto = "\n---\n".join(providencia_lineas)
 
                 get_file_url = None
-                if "00038" in consecutivo_target:
-                    get_file_url = "https://publicacionesprocesales.ramajudicial.gov.co/c/document_library/get_file?uuid=65b68877-ab6f-7f9b-9530-fb098b1e47bc&groupId=6098902"
+                uuid_match = re.search(r'/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', full_pdf_url)
+                if uuid_match:
+                    get_file_url = f"https://publicacionesprocesales.ramajudicial.gov.co/c/document_library/get_file?uuid={uuid_match.group(1)}&groupId=6098902"
                 else:
-                    uuid_match = re.search(r'/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', full_pdf_url)
-                    if uuid_match:
-                        get_file_url = f"https://publicacionesprocesales.ramajudicial.gov.co/c/document_library/get_file?uuid={uuid_match.group(1)}&groupId=6098902"
-                    else:
-                        get_file_url = full_pdf_url
+                    get_file_url = full_pdf_url
 
                 return {
                     "titulo_publicacion": titulo_real,
