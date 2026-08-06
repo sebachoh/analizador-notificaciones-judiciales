@@ -348,16 +348,26 @@ HTML_ACCESSIBLE_TEMPLATE = """
             width: 90%;
             max-width: 600px;
         }
+        .loading-header-flex {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
         .timer-badge {
-            font-size: 2.5rem;
+            font-size: 2rem;
             font-weight: 800;
             color: #0284c7;
             background-color: #e0f2fe;
-            padding: 10px 25px;
+            padding: 10px 24px;
             border-radius: 50px;
             border: 3px solid #38bdf8;
-            display: inline-block;
-            margin-top: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            margin: 0;
         }
         .dynamic-msg {
             font-size: 1.4rem;
@@ -386,8 +396,10 @@ HTML_ACCESSIBLE_TEMPLATE = """
     <!-- Feedback de Carga Interactivo con Contador y Mensajes para Jose Hermes -->
     <div id="loadingOverlay">
         <div class="spinner-center">
-            <div class="spinner-border text-primary" style="width: 5rem; height: 5rem;" role="status"></div>
-            <div class="timer-badge" id="timerSeconds">0s</div>
+            <div class="loading-header-flex">
+                <div class="spinner-border text-primary" style="width: 4.5rem; height: 4.5rem; border-width: 0.35em;" role="status"></div>
+                <div class="timer-badge" id="timerSeconds">0s</div>
+            </div>
             <div class="dynamic-msg" id="dynamicMessage">¡Iniciando búsqueda para Jose Hermes!...</div>
             <p class="fs-5 text-secondary mt-2">Estamos revisando las notificaciones y extrayendo los autos.<br>Por favor aguarde un momento.</p>
         </div>
@@ -553,7 +565,7 @@ HTML_ACCESSIBLE_TEMPLATE = """
                 seconds++;
                 document.getElementById('timerSeconds').innerText = seconds + 's';
                 
-                if (seconds % 3 === 0) {
+                if (seconds % 6 === 0) {
                     const msgAleatorio = mensajesDinamicos[Math.floor(Math.random() * mensajesDinamicos.length)];
                     document.getElementById('dynamicMessage').innerText = msgAleatorio;
                 }
