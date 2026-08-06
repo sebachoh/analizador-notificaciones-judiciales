@@ -5,6 +5,7 @@ import urllib.request
 import urllib.parse
 import json
 import time
+import concurrent.futures
 import pypdf
 from flask import Flask, render_template_string, request, jsonify
 
@@ -102,27 +103,39 @@ def escaneo_directo_publicaciones(desglose):
 
     pdf_dict = {}
 
+    def fetch_page(page_url):
+        try:
+            html_bytes = fetch_url_with_retry(page_url, retries=3)
+            html = html_bytes.decode('utf-8', errors='ignore')
+            urls = re.findall(r'/documents/6098902/[^\s"\\]+', html)
+            found_pdfs = {}
+            for u in urls:
+                clean_link = u.replace(r'\x3d', '=').replace('\\', '')
+                full_link = f"https://publicacionesprocesales.ramajudicial.gov.co{clean_link}"
+                found_pdfs[full_link] = "Notificación por Estado / Publicación Procesal"
+            return found_pdfs
+        except Exception as e:
+            print(f"Advertencia en página: {e}")
+            return {}
+
+    page_urls = []
     for params in params_niveles:
         for page in range(1, 7):
             p = params.copy()
             p['_co_com_avanti_efectosProcesales_PublicacionesEfectosProcesalesPortletV2_INSTANCE_BIyXQFHVaYaq_cur'] = str(page)
-            full_req_url = f"{base_url}?{urllib.parse.urlencode(p)}"
-            try:
-                html_bytes = fetch_url_with_retry(full_req_url, retries=3)
-                html = html_bytes.decode('utf-8', errors='ignore')
-                urls = re.findall(r'/documents/6098902/[^\s"\\]+', html)
-                for u in urls:
-                    clean_link = u.replace(r'\x3d', '=').replace('\\', '')
-                    full_link = f"https://publicacionesprocesales.ramajudicial.gov.co{clean_link}"
-                    pdf_dict[full_link] = "Notificación por Estado / Publicación Procesal"
-            except Exception as e:
-                print(f"Advertencia en página {page}: {e}")
+            page_urls.append(f"{base_url}?{urllib.parse.urlencode(p)}")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        results = executor.map(fetch_page, page_urls)
+        for res in results:
+            pdf_dict.update(res)
 
     hallazgos = []
     consecutivo_target = desglose["consecutivo"]
     anio_target = desglose["anio"]
     
-    for full_pdf_url, titulo_pub in pdf_dict.items():
+    def process_pdf(pdf_item):
+        full_pdf_url, titulo_pub = pdf_item
         try:
             content = fetch_url_with_retry(full_pdf_url, retries=3)
             
@@ -146,7 +159,6 @@ def escaneo_directo_publicaciones(desglose):
                         titulo_real = l
                         break
 
-                # Extraer todas las filas de providencia donde aparezca este radicado
                 providencia_lineas = []
                 for i, line in enumerate(lines):
                     if consecutivo_target in line:
@@ -171,15 +183,22 @@ def escaneo_directo_publicaciones(desglose):
                     else:
                         get_file_url = full_pdf_url
 
-                hallazgos.append({
+                return {
                     "titulo_publicacion": titulo_real,
                     "pdf_url": full_pdf_url,
                     "get_file_url": get_file_url,
                     "resuelve_texto": resuelve_texto,
                     "texto_completo_pdf": pdf_text
-                })
+                }
         except Exception as e:
             print(f"Error procesando PDF {full_pdf_url}: {e}")
+        return None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        pdf_results = executor.map(process_pdf, pdf_dict.items())
+        for res in pdf_results:
+            if res:
+                hallazgos.append(res)
 
     return hallazgos
 
