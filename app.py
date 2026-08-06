@@ -125,7 +125,7 @@ def escaneo_directo_publicaciones(desglose):
             p['_co_com_avanti_efectosProcesales_PublicacionesEfectosProcesalesPortletV2_INSTANCE_BIyXQFHVaYaq_cur'] = str(page)
             page_urls.append(f"{base_url}?{urllib.parse.urlencode(p)}")
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         results = executor.map(fetch_page, page_urls)
         for res in results:
             pdf_dict.update(res)
@@ -191,7 +191,7 @@ def escaneo_directo_publicaciones(desglose):
             print(f"Error procesando PDF {full_pdf_url}: {e}")
         return None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         pdf_results = executor.map(process_pdf, pdf_dict.items())
         for res in pdf_results:
             if res:
@@ -423,7 +423,7 @@ HTML_ACCESSIBLE_TEMPLATE = """
 
     <div class="container">
         <div class="row justify-content-center">
-            <div class="col-lg-10">
+            <div class="{% if desglose %}col-lg-8{% else %}col-lg-10{% endif %}">
 
                 <!-- Pestañas Superiores: Buscador vs Mis Casos Guardados -->
                 <ul class="nav nav-tabs border-bottom-0" id="mainTab" role="tablist">
@@ -487,6 +487,20 @@ HTML_ACCESSIBLE_TEMPLATE = """
                 </div>
 
             </div>
+            
+            {% if desglose %}
+            <div class="col-lg-4">
+                <div class="card-accessible h-100">
+                    <h3 class="fw-bold text-primary mb-3">📍 Datos del Juzgado y Proceso</h3>
+                    <div class="d-flex flex-column gap-3">
+                        <span class="info-pill">📌 Radicado: {{ desglose.radicado_formateado }}</span>
+                        <span class="info-pill">🏛️ {{ desglose.entidad_nombre }} {{ desglose.despacho_num }}</span>
+                        <span class="info-pill">📍 {{ desglose.depto_nombre }} - Pereira</span>
+                        <span class="info-pill">📅 Año: {{ desglose.anio }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         {% if error %}
@@ -499,30 +513,18 @@ HTML_ACCESSIBLE_TEMPLATE = """
         </div>
         {% endif %}
 
-        {% if desglose %}
         <div class="row justify-content-center mt-4">
-            <div class="col-lg-10">
+            <div class="col-lg-12">
                 <div class="card-accessible">
-                    <h3 class="fw-bold text-primary mb-3">📍 Datos del Juzgado y Proceso</h3>
-                    <div>
-                        <span class="info-pill">📌 Radicado: {{ desglose.radicado_formateado }}</span>
-                        <span class="info-pill">🏛️ {{ desglose.entidad_nombre }} {{ desglose.despacho_num }}</span>
-                        <span class="info-pill">📍 {{ desglose.depto_nombre }} - Pereira</span>
-                        <span class="info-pill">📅 Año: {{ desglose.anio }}</span>
+                    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+                        <h3 class="fw-bold text-dark mb-0">📜 Decisiones Notificadas en 2026</h3>
+                        <input type="text" id="filterDecision" class="form-control" style="max-width: 300px;" placeholder="Filtrar por tipo (ej. AUTO)..." onkeyup="filtrarDecisiones()">
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row justify-content-center">
-            <div class="col-lg-10">
-                <div class="card-accessible">
-                    <h3 class="fw-bold text-dark mb-4">📜 Decisiones Notificadas en 2026</h3>
 
                     {% if hallazgos %}
                         {% for item in hallazgos %}
-                        <div class="mb-5 border-bottom pb-4">
-                            <h4 class="fw-bold text-primary mb-3">#{{ loop.index }}. {{ item.titulo_publicacion }}</h4>
+                        <div class="mb-5 border-bottom pb-4 decision-item">
+                            <h4 class="fw-bold text-primary mb-3 decision-title">#{{ loop.index }}. {{ item.titulo_publicacion }}</h4>
 
                             <div class="resuelve-card">
                                 <div class="resuelve-title">
@@ -558,6 +560,20 @@ HTML_ACCESSIBLE_TEMPLATE = """
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // --- FILTRO DE DECISIONES ---
+        function filtrarDecisiones() {
+            const input = document.getElementById('filterDecision').value.toUpperCase();
+            const items = document.querySelectorAll('.decision-item');
+            items.forEach(item => {
+                const title = item.querySelector('.decision-title').innerText.toUpperCase();
+                if (title.includes(input)) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
         // --- MENSAJES DINÁMICOS PARA JOSE HERMES ---
         const mensajesDinamicos = [
             "¡Iniciando búsqueda para Jose Hermes!...",
