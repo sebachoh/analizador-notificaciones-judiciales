@@ -513,6 +513,7 @@ HTML_ACCESSIBLE_TEMPLATE = """
         </div>
         {% endif %}
 
+        {% if desglose %}
         <div class="row justify-content-center mt-4">
             <div class="col-lg-12">
                 <div class="card-accessible">
