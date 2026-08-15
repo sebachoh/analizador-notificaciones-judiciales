@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buscador Judicial — Jose Hermes</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="{{ url_for('static', filename='estilos.css', v=version) }}" rel="stylesheet">
+</head>
+<body>
+
+<header class="barra-accesibilidad">
+  <div class="container d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span class="fw-bold fs-4">⚖️ Asistente Judicial de Jose Hermes</span>
+    <div class="d-flex align-items-center gap-2">
+      <span class="fw-semibold">Tamaño de letra:</span>
+      <button class="btn-tamano" data-escala="0.9">A-</button>
+      <button class="btn-tamano" data-escala="1">Normal</button>
+      <button class="btn-tamano" data-escala="1.2">A+</button>
+      <button class="btn-tamano" data-escala="1.45">A++</button>
+    </div>
+  </div>
+</header>
+
+<main class="container py-4">
+
+  <ul class="nav nav-tabs border-bottom-0" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active pestana" data-bs-toggle="tab" data-bs-target="#panel-buscador" type="button" role="tab">🔍 Buscador</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link pestana" data-bs-toggle="tab" data-bs-target="#panel-casos" type="button" role="tab">
+        📁 Mis casos (<span id="contador-casos">{{ casos|length }}</span>)
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+
+    <!-- ------------------------------------------------ BUSCADOR -->
+    <div class="tab-pane fade show active" id="panel-buscador" role="tabpanel">
+      <div class="tarjeta">
+        <h1 class="h3 fw-bold text-primary mb-3">¡Bienvenido, Jose Hermes!</h1>
+        <p class="fs-5 text-secondary mb-4">
+          Escriba el número de radicado del caso (23 dígitos). El sistema identifica el juzgado,
+          revisa las notificaciones publicadas y le muestra la decisión junto con el enlace al documento original.
+        </p>
+
+        <form id="formulario" action="/buscar" method="POST">
+          <label for="radicado" class="form-label fw-bold fs-5">Número de radicado</label>
+          <input type="text" class="form-control campo-grande mb-2" id="radicado" name="radicado"
+                 placeholder="66001-31-03-004-2026-00149-00" autocomplete="off"
+                 value="{{ radicado_ingresado or '' }}" required>
+          <div id="vista-previa" class="vista-previa" hidden></div>
+
+          <div class="row g-3 align-items-end mt-1">
+            <div class="col-sm-8 col-lg-5">
+              <label for="meses" class="form-label fw-semibold">Periodo a revisar</label>
+              <select class="form-select campo-mediano" id="meses" name="meses">
+                {% for m in [3, 6, 8, 12, 24] %}
+                <option value="{{ m }}" {% if m == meses_defecto %}selected{% endif %}>Últimos {{ m }} meses</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="d-flex gap-3 flex-wrap mt-4">
+            <button type="submit" class="btn-buscar flex-grow-1">🔍 Buscar y leer la decisión</button>
+            <button type="button" class="btn btn-outline-success btn-lg fw-bold" id="btn-guardar">⭐ Guardar este caso</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Progreso -->
+      <div class="tarjeta" id="tarjeta-progreso" hidden>
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <div class="spinner-border text-primary" style="width:3rem;height:3rem;border-width:.3em" role="status"></div>
+          <div class="insignia-tiempo" id="cronometro">0s</div>
+          <div class="flex-grow-1">
+            <div class="fw-bold fs-5 text-primary" id="mensaje-progreso">Iniciando la búsqueda…</div>
+            <div class="progress mt-2" style="height:14px">
+              <div class="progress-bar progress-bar-striped progress-bar-animated" id="barra-progreso" style="width:0%"></div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline-danger fw-bold" id="btn-cancelar">Detener</button>
+        </div>
+      </div>
+
+      <!-- Ficha del despacho -->
+      <div class="tarjeta" id="tarjeta-despacho" {% if not desglose %}hidden{% endif %}>
+        <h2 class="h4 fw-bold text-primary mb-3">📍 Datos del juzgado y del proceso</h2>
+        <div id="datos-despacho" class="d-flex flex-wrap gap-2">
+          {% if desglose %}
+          <span class="pastilla">📌 {{ desglose.formateado }}</span>
+          <span class="pastilla">🏛️ {{ desglose.entidad }} {{ desglose.despacho_numero }}</span>
+          <span class="pastilla">📚 {{ desglose.especialidad }}</span>
+          <span class="pastilla">📍 {{ desglose.ubicacion }}</span>
+          <span class="pastilla">📅 Año {{ desglose.anio }}</span>
+          <span class="pastilla">⚖️ Instancia {{ desglose.instancia }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Expediente según la Rama Judicial -->
+      <div class="tarjeta" id="tarjeta-expediente" {% if not expediente %}hidden{% endif %}>
+        <h2 class="h4 fw-bold text-primary mb-3">📋 El proceso según la Rama Judicial</h2>
+        <div id="datos-expediente">
+          {% if expediente %}
+          <p class="fs-5 mb-2"><strong>{{ expediente.despacho }}</strong></p>
+          <p class="mb-2">{{ expediente.clase_proceso }} — {{ expediente.subclase_proceso }}</p>
+          <p class="mb-2">{{ expediente.sujetos }}</p>
+          <p class="text-secondary mb-0">
+            Radicado el {{ expediente.fecha_radicacion }} ·
+            última actuación el {{ expediente.fecha_ultima_actuacion }}
+          </p>
+          {% endif %}
+        </div>
+        <details class="mt-3" id="bloque-actuaciones" {% if not expediente or not expediente.actuaciones %}hidden{% endif %}>
+          <summary class="fw-bold fs-5 text-primary" style="cursor:pointer">
+            Ver historial de actuaciones (<span id="n-actuaciones">{{ expediente.actuaciones|length if expediente else 0 }}</span>)
+          </summary>
+          <div id="lista-actuaciones" class="mt-3">
+            {% if expediente %}
+              {% for a in expediente.actuaciones %}
+              <div class="actuacion">
+                <span class="actuacion-fecha">{{ a.fecha }}</span>
+                <span class="actuacion-texto">{{ a.actuacion }}{% if a.anotacion %} — {{ a.anotacion }}{% endif %}</span>
+              </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </details>
+      </div>
+
+      {% if error %}
+      <div class="alert alert-danger fs-5 fw-semibold p-4">⚠️ <strong>Atención:</strong> {{ error }}</div>
+      {% endif %}
+      <div id="zona-error"></div>
+
+      <!-- Resultados -->
+      <div class="tarjeta" id="tarjeta-resultados" {% if not desglose %}hidden{% endif %}>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+          <h2 class="h4 fw-bold mb-0" id="titulo-resultados">
+            📜 Decisiones encontradas (<span id="contador-resultados">{{ resultado.hallazgos|length if resultado else 0 }}</span>)
+          </h2>
+          <input type="text" id="filtro" class="form-control" style="max-width:320px"
+                 placeholder="Filtrar por texto (ej. AUTO, admite…)">
+        </div>
+        {% if segundos %}<p class="text-secondary mb-3">Consulta completada en {{ segundos }} segundos.</p>{% endif %}
+
+        <div id="lista-resultados">
+          {% if resultado %}
+            {% for h in resultado.hallazgos %}
+            <article class="resultado">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                <h3 class="h5 fw-bold text-primary mb-0">{{ loop.index }}. {{ h.titulo }}</h3>
+                <span class="certeza certeza-{{ h.certeza }}">{{ h.certeza_texto }}</span>
+              </div>
+              <p class="text-secondary mb-2">
+                {% if h.fecha %}📅 {{ h.fecha }} · {% endif %}{{ h.publicacion }}
+              </p>
+              <div class="tarjeta-decision">
+                <div class="titulo-decision">⚖️ {{ h.decision_etiqueta }}</div>
+                <div class="contenido-decision">{{ h.resumen or h.decision }}</div>
+                {% if h.decision and h.decision != h.resumen %}
+                <details class="detalle-decision">
+                  <summary>Ver el texto completo</summary>
+                  <div class="contenido-decision-completo">{{ h.decision }}</div>
+                </details>
+                {% endif %}
+              </div>
+              <div class="d-flex gap-3 align-items-center flex-wrap">
+                <a href="{{ h.url_documento }}" target="_blank" rel="noopener" class="btn-pdf">📄 Abrir el documento PDF original</a>
+                {% if h.url_estado %}
+                <a href="{{ h.url_estado }}" target="_blank" rel="noopener" class="enlace-alterno">Ver el estado completo del día</a>
+                {% endif %}
+              </div>
+            </article>
+            {% endfor %}
+          {% endif %}
+        </div>
+
+        <div id="sin-resultados" class="alert alert-warning fs-5 fw-semibold mb-0"
+             {% if not resultado or resultado.hallazgos %}hidden{% endif %}>
+          No se encontraron notificaciones para este radicado en el periodo consultado.
+          Puede intentar ampliando el periodo a 12 o 24 meses.
+        </div>
+      </div>
+    </div>
+
+    <!-- ------------------------------------------------ MIS CASOS -->
+    <div class="tab-pane fade" id="panel-casos" role="tabpanel">
+      <div class="tarjeta">
+        <h2 class="h3 fw-bold text-primary mb-3">📁 Mis casos guardados</h2>
+        <p class="fs-5 text-secondary mb-4">
+          Los casos quedan guardados en este computador, así que siguen aquí aunque cierre el navegador.
+        </p>
+
+        <div class="row g-2 mb-4">
+          <div class="col-lg-6">
+            <input type="text" class="form-control campo-grande" id="nuevo-radicado" placeholder="Radicado (23 dígitos)">
+          </div>
+          <div class="col-lg-4">
+            <input type="text" class="form-control campo-grande" id="nueva-referencia" placeholder="Referencia (ej. Cobro Fiducentro)">
+          </div>
+          <div class="col-lg-2 d-grid">
+            <button class="btn btn-success fw-bold fs-5" id="btn-agregar">➕ Agregar</button>
+          </div>
+        </div>
+
+        <div id="lista-casos"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="text-center text-secondary py-4">
+    Buscador Judicial Colombia <strong>v{{ version }}</strong> ·
+    Datos tomados del portal oficial de la Rama Judicial.
+  </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='app.js', v=version) }}"></script>
+</body>
+</html>
